@@ -9,6 +9,7 @@
  * @version 0.1.0
  * @since 0.1.0
  */
+'use strict';
 const assert = require('assert');
 const npm = require('../');
 const path = require('path');
@@ -17,8 +18,16 @@ describe('npm', () => {
     describe('test', function() {
         this.timeout(5e3);
         it('should', done => {
-            npm('./node_modules/', (err, files) => {
-                console.log(files);
+            npm(path.join(__dirname, '..', 'node_modules'), {
+                moduleId: function(file) {
+                    return 'namespace:node_modules/' + file
+                },
+                moduleDep: function(dep) {
+                    if(!dep)return dep;
+                    return 'namespace:node_modules/' + path.relative(path.join(__dirname, '..', 'node_modules'), dep)
+                }
+            }, (err) => {
+                console.log(err);
                 done();
             });
         });

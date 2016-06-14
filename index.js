@@ -10,12 +10,15 @@
  * @since 0.1.0
  */
 'use strict';
-const extend = require('lodash/fp/extend');
+const extend = require('lodash/extend');
 const isString = require('lodash/isString');
 const isFunction = require('lodash/isFunction');
 const glob = require('glob');
 const path = require('path');
-const babel = require('babel-core');
+const fs = require('fs');
+const mkdirp = require('mkdirp');
+const nodeResolve = require('../node-resolve/');
+const cjs = require('../transform-commonjs-modules-systemjs/');
 
 module.exports = function(cwd, opts, cb) {
 
@@ -25,7 +28,10 @@ module.exports = function(cwd, opts, cb) {
     }
 
     const options = extend({
-        exclude: null
+        exclude: null,
+        dest: 'output',
+        moduleId: file => file,
+        moduleDep: dep=>dep
     }, opts);
 
     cb = cb || (() => {});
@@ -49,12 +55,45 @@ module.exports = function(cwd, opts, cb) {
             }
         });
     }).then(files => {
-        return new Promise(resolve => {
-            resolve(files.map(file => {
-                return path.join(cwd, file);
-            }));
+        const tasks = files.map(file => {
+            return new Promise((resolve, reject) => {
+                const moduleId = options.moduleId(file);
+                  console.log('Processing ' + moduleId);
+                cjs.transformFile(path.join(cwd, file), {
+                    moduleId: moduleId,
+                    translateDep: dep => {
+                        return options.moduleDep(nodeResolve.resolve(path.join(cwd, file), dep));
+                    }
+                }, (err, result) => {
+                  
+                    if (err) {
+                        reject(err);
+                    } else {
+                        let targetDir = options.dest;
+                        if (!fs.existsSync(targetDir)) {
+                            mkdirp.sync(targetDir);
+                        }
+                        let stat = fs.statSync(targetDir);
+                        if (!stat.isDirectory()) {
+                            reject(new Error(`"${targetDir}" is not a directory`));
+                        }
+
+                        fs.writeFile(path.join(targetDir, file.replace(/\//mg, '_')), result.code, err => {
+                            if (err) {
+                                reject(err);
+                            } else {
+                                resolve();
+                            }
+                        });
+
+                    }
+                });
+            });
         });
-    }).then(files => {
-        cb(null, files);
+
+
+        return Promise.all(tasks);
+    }).then(tasks => {
+        cb(null, tasks);
     }, cb);
 };
