@@ -23,6 +23,8 @@
   },
   "homepage": "https://github.com/antiaris/antiaris-npm",
   "dependencies": {
+    "antiaris-node-resolve": "^1.0.0",
+    "antiaris-transform-commonjs-modules-systemjs": "^1.0.0",
     "glob": "^7.0.3",
     "lodash": "^4.13.1",
     "mkdirp": "^0.5.1"

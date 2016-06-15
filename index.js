@@ -17,8 +17,8 @@ const glob = require('glob');
 const path = require('path');
 const fs = require('fs');
 const mkdirp = require('mkdirp');
-const nodeResolve = require('../node-resolve/');
-const cjs = require('../transform-commonjs-modules-systemjs/');
+const nodeResolve = require('antiaris-node-resolve');
+const cjs = require('antiaris-transform-commonjs-modules-systemjs');
 
 module.exports = function (cwd, opts, cb) {
 
