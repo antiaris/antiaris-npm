@@ -13,21 +13,25 @@
 const assert = require('assert');
 const npm = require('../');
 const path = require('path');
+const fs = require('fs');
 
 describe('npm', () => {
-    describe('test', function() {
+    describe('test', function () {
         this.timeout(5e3);
         it('should', done => {
             npm(path.join(__dirname, '..', 'node_modules'), {
-                moduleId: function(file) {
+                moduleId: function (file) {
                     return 'namespace:node_modules/' + file
                 },
-                moduleDep: function(dep) {
-                    if(!dep)return dep;
-                    return 'namespace:node_modules/' + path.relative(path.join(__dirname, '..', 'node_modules'), dep)
+                moduleDep: function (dep) {
+                    if (!dep) return dep;
+                    return 'namespace:node_modules/' + path.relative(path.join(
+                        __dirname, '..', 'node_modules'), dep)
                 }
-            }, (err) => {
-                console.log(err);
+            }, (err, resourceMap) => {
+                console.error(err);
+                fs.writeFileSync('resource-map.json', JSON.stringify(resourceMap, null,
+                    4));
                 done();
             });
         });

@@ -20,7 +20,7 @@ const mkdirp = require('mkdirp');
 const nodeResolve = require('../node-resolve/');
 const cjs = require('../transform-commonjs-modules-systemjs/');
 
-module.exports = function(cwd, opts, cb) {
+module.exports = function (cwd, opts, cb) {
 
     if (arguments.length < 3) {
         cb = opts;
@@ -28,10 +28,11 @@ module.exports = function(cwd, opts, cb) {
     }
 
     const options = extend({
+        pattern: '**/*.js',
         exclude: null,
         dest: 'output',
         moduleId: file => file,
-        moduleDep: dep=>dep
+        moduleDep: dep => dep
     }, opts);
 
     cb = cb || (() => {});
@@ -45,7 +46,7 @@ module.exports = function(cwd, opts, cb) {
     }
 
     new Promise((resolve, reject) => {
-        glob('**/*.js', {
+        glob(options.pattern || '**/*.js', {
             cwd: cwd
         }, (err, files) => {
             if (err) {
@@ -55,21 +56,31 @@ module.exports = function(cwd, opts, cb) {
             }
         });
     }).then(files => {
+        const resourceMap = {};
+
         const tasks = files.map(file => {
             return new Promise((resolve, reject) => {
                 const moduleId = options.moduleId(file);
-                  console.log('Processing ' + moduleId);
+
                 cjs.transformFile(path.join(cwd, file), {
                     moduleId: moduleId,
                     translateDep: dep => {
-                        return options.moduleDep(nodeResolve.resolve(path.join(cwd, file), dep));
+                        return options.moduleDep(nodeResolve.resolve(path.join(
+                            cwd, file), dep));
                     }
                 }, (err, result) => {
-                  
+
                     if (err) {
-                        reject(err);
+                        // Ignore
+                        resolve();
+                        //reject(err);
                     } else {
                         let targetDir = options.dest;
+
+                        const fileName = file.replace(/\//mg,
+                            '_');
+                        const filePath = path.join(targetDir, fileName);
+
                         if (!fs.existsSync(targetDir)) {
                             mkdirp.sync(targetDir);
                         }
@@ -78,13 +89,19 @@ module.exports = function(cwd, opts, cb) {
                             reject(new Error(`"${targetDir}" is not a directory`));
                         }
 
-                        fs.writeFile(path.join(targetDir, file.replace(/\//mg, '_')), result.code, err => {
-                            if (err) {
-                                reject(err);
-                            } else {
-                                resolve();
-                            }
-                        });
+                        resourceMap[moduleId] = {
+                            deps: result.deps,
+                            uri: fileName
+                        }
+
+                        fs.writeFile(filePath,
+                            result.code, err => {
+                                if (err) {
+                                    reject(err);
+                                } else {
+                                    resolve();
+                                }
+                            });
 
                     }
                 });
@@ -92,8 +109,10 @@ module.exports = function(cwd, opts, cb) {
         });
 
 
-        return Promise.all(tasks);
-    }).then(tasks => {
-        cb(null, tasks);
-    }, cb);
+        return Promise.all(tasks).then(function () {
+            return Promise.resolve(resourceMap);
+        });
+    }).then(resourceMap => {
+        cb(null, resourceMap);
+    }).catch(cb);
 };
