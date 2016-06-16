@@ -19,6 +19,17 @@ const fs = require('fs');
 const mkdirp = require('mkdirp');
 const nodeResolve = require('antiaris-node-resolve');
 const cjs = require('antiaris-transform-commonjs-modules-systemjs');
+const crypto = require('crypto');
+
+const Numbase = require('numbase');
+
+const base = new Numbase();
+
+const getDigest = (content) => {
+    let digest = crypto.createHash('md5').update(content).digest('hex');
+    digest = (parseInt(digest, 16) % 1e10).toString(16);
+    return base.encode(base.decode(digest, 16));
+}
 
 module.exports = function (cwd, opts, cb) {
 
@@ -32,7 +43,8 @@ module.exports = function (cwd, opts, cb) {
         exclude: null,
         dest: 'output',
         moduleId: file => file,
-        moduleDep: dep => dep
+        moduleDep: dep => dep,
+        moduleUri: uri => uri
     }, opts);
 
     cb = cb || (() => {});
@@ -73,13 +85,18 @@ module.exports = function (cwd, opts, cb) {
                     if (err) {
                         // Ignore
                         resolve();
-                        //reject(err);
                     } else {
                         let targetDir = options.dest;
+                        let md5 = getDigest(result.code);
+                        let ext = path.extname(file);
 
-                        const fileName = file.replace(/\//mg,
-                            '_');
-                        const filePath = path.join(targetDir, fileName);
+                        if ('.jsx' === ext) {
+                            ext = '.js';
+                        }
+
+                        let fileName = md5 + ext;
+
+                        let filePath = path.join(targetDir, fileName);
 
                         if (!fs.existsSync(targetDir)) {
                             mkdirp.sync(targetDir);
@@ -91,7 +108,7 @@ module.exports = function (cwd, opts, cb) {
 
                         resourceMap[moduleId] = {
                             deps: result.deps,
-                            uri: fileName
+                            uri: options.moduleUri(fileName)
                         }
 
                         fs.writeFile(filePath,
